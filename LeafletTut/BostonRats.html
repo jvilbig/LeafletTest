@@ -1,0 +1,77 @@
+<html>
+<head>
+    <title>Rodents Sited in Boston</title>
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css"/>
+    <link rel="stylesheet" href="MarkerCluster.css"/>
+    <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+    <script src="leaflet.markercluster.js"></script>
+    <script src="leaflet.heat.js"></script>
+    <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <style>
+        #map{ height: 100% }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+    // initialize map
+    var map = L.map('map').setView([42.35, -71.08], 13);
+    //load tile layer
+    L.tileLayer('http://tiles.mapc.org/basemap/{z}/{x}/{y}.png',
+        {
+            attribution: 'Tiles by <a href="http://mapc.org">MAPC</a>, Data by <a href="http://mass.gov/mgis">MassGIS</a>',
+            maxZoom: 17,
+            minZoom: 9
+        }).addTo(map);
+    //add neighborhood polygons and chloropleth map. must include '.js'
+    $.getJSON("neighborhoods.js",function(hoodData){
+        L.geoJson( hoodData , {
+            style: function(feature){
+                var fillColor,
+                    density = feature.properties.density;
+                if ( density > 80 ) fillColor = "#006837";
+                else if ( density > 40 ) fillColor = "#31a354";
+                else if ( density > 20 ) fillColor = "#78c679";
+                else if ( density > 10 ) fillColor = "#c2e699";
+                else if ( density > 0 ) fillColor = "#ffffcc";
+                else fillColor = "#f7f7f7";  // no data
+                return {color: "#999", weight: 1, fillColor: fillColor, fillOpacity: .6 };
+            },
+            onEachFeature: function( feature, layer ){
+                layer.bindPopup( "<strong>" + feature.properties.Name + "</strong></br>" + feature.properties.density + " rats per square mile" )
+            }
+        }).addTo(map);
+    });
+
+    //load GeoJSON from an external file
+    $.getJSON("rodent.js",function(data){
+        //create a heat map
+        var locations = data.features.map(function(rat) {
+            var location = rat.geometry.coordinates.reverse();
+            location.push(0.5);
+            return location;
+        });
+        var heat = L.heatLayer(locations,{ radius: 35 });
+        map.addLayer(heat);
+
+        //make icon an image of a rat
+        var ratIcon = L.icon({
+            iconUrl:'https://maptimeboston.github.io/leaflet-intro/rat.png',
+            iconSize: [30,20]
+        });
+        //add GeoJSON layer to the map once the file is loaded
+        var rodents = L.geoJson(data,{
+            pointToLayer: function(feature,latlng){
+                var marker = L.marker(latlng,{icon: ratIcon});
+                marker.bindPopup(feature.properties.Location + 'br/>' + feature.properties.OPEN_DT);
+                return marker;
+            }
+        });
+        var clusters = L.markerClusterGroup();
+        clusters.addLayer(rodents);
+        map.addLayer(clusters);
+    });
+
+    </script>
+</body>
+</html>
